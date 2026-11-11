@@ -38,6 +38,6 @@ Result Unmount(const char* mountName) noexcept;
 
 Result CreateFile(const char* path, s64 size) noexcept;
 Result SetFileSize(FileHandle handle, s64 size) noexcept;
-Result WriteFile(FileHandle handle, s64 offset, const void* buffer, u32 size, const WriteOption& option) noexcept;
+Result WriteFile(FileHandle handle, s64 offset, const void* buffer, unsigned int size, const WriteOption& option) noexcept;
 
 }
