@@ -40,6 +40,7 @@ void forge_main()
 {
     forge_log_trace("[forge] Initializing Forge...");
     forge_log_trace("[forge] Version %s", FORGE_VERSION);
+    forge_log_trace("Forge hardware source build %s", FORGE_VERSION);
 
     if (!FORGE_VERSION_IS_RELEASE) {
         forge_log_trace("[WARN] [forge] Running a non-release build, expect instability and crashes");

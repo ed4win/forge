@@ -237,7 +237,13 @@ extern "C" void forge_plugin_loadPlugins(void)
 
             nn::crypto::GenerateSha256Hash(&plugin.hash, sizeof(ShaHash), nro_header, nro_header->size);
 
-            plugin_hashes.insert(plugin.hash);
+            // 同一个插件镜像只加载一次：内容相同（哪怕文件名不同）直接跳过，
+            // 否则会在同一地址挂两次钩子，进游戏即崩。
+            if (!plugin_hashes.insert(plugin.hash).second) {
+                forge_log_warn("Duplicate plugin image skipped: %s", path);
+                continue;
+            }
+
             s_pluginLoader.plugins.emplace_back(std::move(plugin));
         }
     }
@@ -271,8 +277,14 @@ extern "C" void forge_plugin_loadPlugins(void)
         return;
     }
 
+    size_t load_failed = 0;
     for (auto& plugin : s_pluginLoader.plugins) {
         forge_log_info("Loading plugin %s", plugin.path.c_str());
+        forge_log_debug("LoadModule begin: %s image=%p size=0x%zX bss=0x%zX",
+            plugin.path.c_str(),
+            (void*)plugin.data.get(),
+            plugin.data_size,
+            plugin.bss_size);
 
         plugin.bss = forge_allocAligned<PAGE_SIZE>(plugin.bss_size);
         r = nn::ro::LoadModule(
@@ -283,8 +295,15 @@ extern "C" void forge_plugin_loadPlugins(void)
             nn::ro::BindFlag_Now);
         if (R_FAILED(r)) {
             forge_log_error("Failed to load plugin %s: 0x%08X", plugin.path.c_str(), r);
+            ++load_failed;
             continue;
         }
+
+        forge_log_debug("LoadModule result: %s rc=0x%08X state=%u loaded=%d",
+            plugin.path.c_str(),
+            r,
+            (unsigned)plugin.module.State,
+            (int)plugin.module.isLoaded);
     }
 
     std::set<ShaHash> to_remove;
@@ -327,11 +346,17 @@ extern "C" void forge_plugin_loadPlugins(void)
             forge_log_debug("Initializing plugin %s", plugin.path.c_str());
             plugin.events.on_init();
         }
+
+        forge_log_debug("Plugin ready: %s", plugin.path.c_str());
     }
 
     std::erase_if(s_pluginLoader.plugins, [&to_remove](const Plugin& plugin) {
         return to_remove.contains(plugin.hash);
     });
+
+    forge_log_info("Plugin loading finished: %zu active, %zu failed",
+        s_pluginLoader.plugins.size(),
+        load_failed);
 }
 
 extern "C" void forge_plugin_renderPluginInfo(void)

@@ -1,0 +1,77 @@
+name: Hardware Release Build
+
+# 实机版 Forge：-O2 + 释放构建 + SD 卡日志 + 插件去重
+# 手动触发：Actions -> Hardware Release Build -> Run workflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master, hw-release ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+
+    env:
+      DEVKITPRO: /opt/devkitpro
+
+    steps:
+      - name: Install build deps
+        run: |
+          apt-get update
+          apt-get install -y git liblz4-dev zip unzip ca-certificates
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Mark workspace safe
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # 让 Makefile 的 git describe 命中 tag => FORGE_VERSION_IS_RELEASE=1，
+      # 版本号固定为 1.5.1，且不再打 "non-release build" 警告。
+      - name: Stamp release version
+        run: |
+          git tag -f v1.5.1
+          git describe --tags --always
+
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /etc/profile.d/devkit-env.sh
+          make -j"$(nproc)"
+
+      - name: Show artifacts
+        shell: bash
+        run: |
+          ls -l subsdk.nso main.npdm
+          sha256sum subsdk.nso main.npdm
+
+      - name: Package forge tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf out
+          mkdir -p out/forge/exefs out/forge/romfs/nativeNX/forge
+          cp subsdk.nso out/forge/exefs/subsdk9
+          cp main.npdm  out/forge/exefs/main.npdm
+          cp -R data/. out/forge/romfs/nativeNX/forge/
+          cd out
+          zip -r ../forge-hw-release.zip forge
+          cd ..
+          unzip -l forge-hw-release.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-hw-release
+          path: |
+            forge-hw-release.zip
+            subsdk.nso
+            main.npdm
+          if-no-files-found: error

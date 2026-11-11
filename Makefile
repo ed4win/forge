@@ -42,7 +42,7 @@ INIPARSER_LIB	:=	$(INIPARSER_BUILD)/libiniparser.a
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -mfloat-abi=softfp -mfpu=crypto-neon-fp-armv8 -fPIC -ftls-model=initial-exec
 
-CFLAGS	:=	-g -Wall -Werror \
+CFLAGS	:=	-g -O2 -DNDEBUG -Wall -Wno-error \
 			-ffunction-sections \
 			-fdata-sections \
 			$(ARCH) \
