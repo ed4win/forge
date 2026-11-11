@@ -3,7 +3,7 @@
 
 #include <switch.h>
 
-/* 实机日志落盘：挂 SD 卡为 forge_log:，把日志追加到 SD 根目录 forge-loader.log。
+/* 实机日志落盘：把 SD 卡挂成 forge_log:，日志追加到 SD 根目录 forge-loader.log。
  * 任何一步失败都整体降级（只保留 svcOutputDebugString），不抛异常、不 abort。 */
 
 namespace {
@@ -24,7 +24,7 @@ void openLogLocked()
         return;
     }
 
-    if (R_FAILED(nn::fs::MountSdCard(kMountName))) {
+    if (nn::fs::MountSdCard(kMountName).IsFailure()) {
         // 早期调用时 fs 服务可能还没就绪，允许重试；超过阈值才放弃。
         if (++s_mountRetries >= 64) {
             s_disabled = true;
@@ -35,12 +35,12 @@ void openLogLocked()
     // 文件已存在时 CreateFile 会返回错误，忽略即可。
     (void)nn::fs::CreateFile(kLogPath, 0);
 
-    if (R_FAILED(nn::fs::OpenFile(&s_file, kLogPath, nn::fs::OpenMode_ReadWrite))) {
+    if (nn::fs::OpenFile(&s_file, kLogPath, nn::fs::OpenMode_ReadWrite).IsFailure()) {
         s_disabled = true;
         return;
     }
 
-    if (R_FAILED(nn::fs::GetFileSize(&s_offset, s_file))) {
+    if (nn::fs::GetFileSize(&s_offset, s_file).IsFailure()) {
         s_offset = 0;
     }
 
@@ -61,13 +61,13 @@ void writeLocked(const char* text, size_t len)
     }
 
     nn::fs::WriteOption option {};
-    if (R_FAILED(nn::fs::WriteFile(s_file, s_offset, text, (u32)len, option))) {
+    if (nn::fs::WriteFile(s_file, s_offset, text, static_cast<u32>(len), option).IsFailure()) {
         s_opened = false;
         s_disabled = true;
         return;
     }
 
-    s_offset += (s64)len;
+    s_offset += static_cast<s64>(len);
 }
 
 } // namespace

@@ -22,7 +22,8 @@ void CloseFile(FileHandle handle) noexcept;
 Result GetFileSize(s64* outValue, FileHandle handle) noexcept;
 Result ReadFile(FileHandle handle, s64 offset, void* buffer, size_t size) noexcept;
 
-// ---- 实机日志落盘所需（与 MHGU 内 nnSdk 导出一致，见 exefs 导入表）----
+// Hardware logging helpers (used by source/forge/logsd.cpp).
+// Signatures mirror the nnSdk exports observed in the retail exefs import table.
 struct WriteOption {
     u32 flags;
 
