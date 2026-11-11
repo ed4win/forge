@@ -46,6 +46,7 @@ CFLAGS	:=	-g -O2 -DNDEBUG -Wall -Wno-error \
 			-ffunction-sections \
 			-fdata-sections \
 			$(ARCH) \
+			$(EXTRA_CFLAGS) \
 			$(BUILD_CFLAGS)
 
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__ -DLIBNX_NO_DEPRECATION

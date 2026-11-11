@@ -1,12 +1,12 @@
-name: Hardware Release Build
+﻿name: Hardware Release Build
 
-# 实机版 Forge：-O2 + 释放构建 + SD 卡日志 + 插件去重
-# 手动触发：Actions -> Hardware Release Build -> Run workflow
-
+# 瀹炴満鐗?Forge 鏋勫缓鐭╅樀锛?#   o2_nosd  - -O2锛屾棤 SD 钀界洏锛堜笉璋冪敤 nn::fs锛?  <- 浼樺厛娴嬭瘯
+#   o2_sd    - -O2锛屽甫 SD 钀界洏
+#   o0_nosd  - -O0锛屾棤 SD 钀界洏锛堟渶鎺ヨ繎瀹樻柟璇箟锛?# 浜х墿缁熶竴杞垚鏈帇缂?NSO锛堝甫姝ｇ‘ SHA256 鍝堝笇琛級銆?
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master, hw-release ]
+    branches: [ main ]
 
 jobs:
   build:
@@ -21,7 +21,7 @@ jobs:
       - name: Install build deps
         run: |
           apt-get update
-          apt-get install -y git liblz4-dev zip unzip ca-certificates
+          apt-get install -y git liblz4-dev zip unzip python3 ca-certificates
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,48 +32,55 @@ jobs:
       - name: Mark workspace safe
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      # 让 Makefile 的 git describe 命中 tag => FORGE_VERSION_IS_RELEASE=1，
-      # 版本号固定为 1.5.1，且不再打 "non-release build" 警告。
       - name: Stamp release version
         run: |
           git tag -f v1.5.1
           git describe --tags --always
 
-      - name: Build
+      - name: Build matrix
         shell: bash
         run: |
           set -euo pipefail
           source /etc/profile.d/devkit-env.sh
-          make -j"$(nproc)"
+          build() {
+            local name="$1"; shift
+            echo "=== building $name : $* ==="
+            make clean >/dev/null 2>&1 || true
+            make -j"$(nproc)" "$@"
+            python3 scripts/nso_uncompress.py subsdk.nso "dist_$name.nso"
+            sha256sum "dist_$name.nso"
+          }
+          mkdir -p dist
+          build o2_nosd EXTRA_CFLAGS=-DFORGE_SD_LOG=0
+          build o2_sd
+          build o0_nosd EXTRA_CFLAGS="-DFORGE_SD_LOG=0 -O0"
+          grep -c . /dev/null || true
 
-      - name: Show artifacts
-        shell: bash
-        run: |
-          ls -l subsdk.nso main.npdm
-          sha256sum subsdk.nso main.npdm
-
-      - name: Package forge tree
+      - name: Package variants
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf out
-          mkdir -p out/forge/exefs out/forge/romfs/nativeNX/forge
-          cp subsdk.nso out/forge/exefs/subsdk9
-          cp main.npdm  out/forge/exefs/main.npdm
-          cp data/config.ini out/forge/romfs/nativeNX/forge/
-          cp -R data/fonts out/forge/romfs/nativeNX/forge/
-          cp -R data/shaders out/forge/romfs/nativeNX/forge/
-          cd out
-          zip -r ../forge-hw-release.zip forge
-          cd ..
-          unzip -l forge-hw-release.zip
+          for v in o2_nosd o2_sd o0_nosd; do
+            d="forge-$v"
+            rm -rf "$d"
+            mkdir -p "$d/exefs" "$d/romfs/nativeNX/forge"
+            cp "dist_$v.nso" "$d/exefs/subsdk9"
+            cp main.npdm "$d/exefs/main.npdm"
+            cp data/config.ini "$d/romfs/nativeNX/forge/"
+            cp -R data/fonts data/shaders "$d/romfs/nativeNX/forge/"
+            zip -r "$d.zip" "$d"
+            ls -l "$d/exefs/subsdk9"
+          done
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: forge-hw-release
+          name: forge-hw-matrix
           path: |
-            forge-hw-release.zip
-            subsdk.nso
-            main.npdm
+            forge-o2_nosd.zip
+            forge-o2_sd.zip
+            forge-o0_nosd.zip
+            dist_o2_nosd.nso
+            dist_o2_sd.nso
+            dist_o0_nosd.nso
           if-no-files-found: error

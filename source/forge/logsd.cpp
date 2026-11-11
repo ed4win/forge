@@ -1,10 +1,17 @@
 #include "forge/logsd.h"
+
+#ifndef FORGE_SD_LOG
+#define FORGE_SD_LOG 1
+#endif
+
+#if FORGE_SD_LOG
+
 #include "forge/nn/fs.h"
 
 #include <switch.h>
 
-/* 实机日志落盘：把 SD 卡挂成 forge_log:，日志追加到 SD 根目录 forge-loader.log。
- * 任何一步失败都整体降级（只保留 svcOutputDebugString），不抛异常、不 abort。 */
+// Writes the forge log to the SD card root as forge-loader.log (mount name forge_log:).
+// Any failure simply disables file logging; the game is never aborted from here.
 
 namespace {
 
@@ -25,14 +32,14 @@ void openLogLocked()
     }
 
     if (nn::fs::MountSdCard(kMountName).IsFailure()) {
-        // 早期调用时 fs 服务可能还没就绪，允许重试；超过阈值才放弃。
+        // fs service may not be ready during early init; retry a bounded number of times.
         if (++s_mountRetries >= 64) {
             s_disabled = true;
         }
         return;
     }
 
-    // 文件已存在时 CreateFile 会返回错误，忽略即可。
+    // Fails when the file already exists; that is fine.
     (void)nn::fs::CreateFile(kLogPath, 0);
 
     if (nn::fs::OpenFile(&s_file, kLogPath, nn::fs::OpenMode_ReadWrite).IsFailure()) {
@@ -61,7 +68,7 @@ void writeLocked(const char* text, size_t len)
     }
 
     nn::fs::WriteOption option {};
-    if (nn::fs::WriteFile(s_file, s_offset, text, static_cast<u32>(len), option).IsFailure()) {
+    if (nn::fs::WriteFile(s_file, s_offset, text, static_cast<unsigned int>(len), option).IsFailure()) {
         s_opened = false;
         s_disabled = true;
         return;
@@ -86,3 +93,14 @@ extern "C" void forge_logsd_write(const char* text, size_t len)
 
     __sync_lock_release(&s_lock);
 }
+
+#else
+
+// Build with -DFORGE_SD_LOG=0 to remove every nn::fs call from the module.
+extern "C" void forge_logsd_write(const char* text, size_t len)
+{
+    (void)text;
+    (void)len;
+}
+
+#endif
