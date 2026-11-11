@@ -1,4 +1,4 @@
-﻿name: Hardware Release Build
+name: Hardware Release Build
 
 # 瀹炴満鐗?Forge 鏋勫缓鐭╅樀锛?#   o2_nosd  - -O2锛屾棤 SD 钀界洏锛堜笉璋冪敤 nn::fs锛?  <- 浼樺厛娴嬭瘯
 #   o2_sd    - -O2锛屽甫 SD 钀界洏
@@ -47,8 +47,8 @@ jobs:
             echo "=== building $name : $* ==="
             make clean >/dev/null 2>&1 || true
             make -j"$(nproc)" "$@"
-            python3 scripts/nso_uncompress.py subsdk.nso "dist_$name.nso"
-            sha256sum "dist_$name.nso"
+            python3 scripts/nso_uncompress.py subsdk.nso "dist/$name.nso"
+            sha256sum "dist/$name.nso"
           }
           mkdir -p dist
           build o2_nosd EXTRA_CFLAGS=-DFORGE_SD_LOG=0
@@ -64,7 +64,7 @@ jobs:
             d="forge-$v"
             rm -rf "$d"
             mkdir -p "$d/exefs" "$d/romfs/nativeNX/forge"
-            cp "dist_$v.nso" "$d/exefs/subsdk9"
+            cp "dist/$v.nso" "$d/exefs/subsdk9"
             cp main.npdm "$d/exefs/main.npdm"
             cp data/config.ini "$d/romfs/nativeNX/forge/"
             cp -R data/fonts data/shaders "$d/romfs/nativeNX/forge/"
@@ -80,7 +80,5 @@ jobs:
             forge-o2_nosd.zip
             forge-o2_sd.zip
             forge-o0_nosd.zip
-            dist_o2_nosd.nso
-            dist_o2_sd.nso
-            dist_o0_nosd.nso
+            dist/
           if-no-files-found: error
