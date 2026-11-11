@@ -60,7 +60,9 @@ jobs:
           mkdir -p out/forge/exefs out/forge/romfs/nativeNX/forge
           cp subsdk.nso out/forge/exefs/subsdk9
           cp main.npdm  out/forge/exefs/main.npdm
-          cp -R data/. out/forge/romfs/nativeNX/forge/
+          cp data/config.ini out/forge/romfs/nativeNX/forge/
+          cp -R data/fonts out/forge/romfs/nativeNX/forge/
+          cp -R data/shaders out/forge/romfs/nativeNX/forge/
           cd out
           zip -r ../forge-hw-release.zip forge
           cd ..
